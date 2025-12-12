@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintMaker | Sanatsal Baskı Atölyesi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Patrick+Hand&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+    
+    <script>
+        // --- API KEY SIFIRLANDI ---
+        // Sistem tarafından otomatik sağlanması için boş bırakıldı.
+        const apiKey = ""; 
+        
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'hand': ['Patrick Hand', 'cursive'],
+                        'marker': ['Caveat', 'cursive'],
+                        'sketch': ['Shadows Into Light', 'cursive'],
+                    },
+                    colors: {
+                        'pencil': '#2d2d2d',
+                        'charcoal': '#1a1a1a',
+                        'paper': '#f4f1ea',
+                        'paper-dark': '#e6e2d8',
+                        'sanguine': '#8a3324',
+                    },
+                    animation: {
+                        'wiggle': 'wiggle 0.3s ease-in-out infinite',
+                        'draw': 'draw 1s ease-out forwards',
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Dokulu Kağıt Arka Planı */
+        body {
+            background-color: #f4f1ea;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+            color: #2d2d2d;
+            font-family: 'Patrick Hand', cursive;
+        }
+
+        /* Karakalem Çizim Efektli Kutular */
+        .sketch-box {
+            background: rgba(255, 255, 255, 0.6);
+            border: 2px solid #2d2d2d;
+            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+            box-shadow: 2px 3px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .sketch-box:hover {
+            box-shadow: 4px 6px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px) scale(1.01);
+        }
+
+        /* Karalama Buton Stili */
+        .sketch-btn {
+            position: relative;
+            background: transparent;
+            border: 2px solid #2d2d2d;
+            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+            color: #2d2d2d;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .sketch-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #2d2d2d;
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s ease;
+            z-index: -1;
+        }
+
+        .sketch-btn:hover {
+            color: #f4f1ea;
+            border-color: #2d2d2d;
+        }
+
+        .sketch-btn:hover::before {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        .sketch-btn.active {
+            background: #2d2d2d;
+            color: #f4f1ea;
+            transform: rotate(-1deg);
+        }
+
+        /* Scribble Loading Animation */
+        .scribble-loader {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #2d2d2d;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4">
+
+    <!-- HEADER -->
+    <header class="text-center mb-8 relative">
+        <h1 class="font-marker text-7xl md:text-8xl text-pencil drop-shadow-sm rotate-[-2deg] font-bold">PrintMaker</h1>
+        <p class="font-sketch text-2xl text-gray-600 mt-2 rotate-[1deg] tracking-wide">Dijitalden Geleneksel Baskıya</p>
+        
+        <svg class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-4 text-pencil opacity-60" viewBox="0 0 200 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 10C40 10 50 2 100 2C150 2 160 12 198 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+    </header>
+
+    <main class="w-full max-w-4xl flex flex-col gap-8">
+
+        <!-- 1. UPLOAD & PREVIEW SECTION -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <!-- Upload Box -->
+            <div class="sketch-box p-6 flex flex-col items-center justify-center min-h-[350px] relative bg-white/80">
+                <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileUpload(this)">
+                
+                <!-- Placeholder / Upload Prompt -->
+                <div id="uploadPrompt" class="text-center cursor-pointer group w-full h-full flex flex-col items-center justify-center" onclick="document.getElementById('fileInput').click()">
+                    <div class="w-24 h-24 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center mb-4 group-hover:border-pencil group-hover:scale-110 transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-500 group-hover:text-pencil" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </div>
+                    <h3 class="font-marker text-3xl text-pencil mb-2 font-bold">Görsel Yükle</h3>
+                    <p class="text-gray-500 text-lg">Bir portre veya kompozisyon seçin</p>
+                    <p class="text-xs text-gray-400 mt-4">(Baskıresim sanatına dönüşecek)</p>
+                </div>
+
+                <!-- Preview Image -->
+                <div id="previewContainer" class="hidden relative w-full h-full">
+                    <img id="previewImg" src="" class="w-full h-full object-contain max-h-[400px] p-2 bg-white shadow-sm border border-gray-200 transform rotate-1" alt="Önizleme">
+                    <button onclick="resetUpload()" class="absolute -top-2 -right-2 bg-sanguine text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 font-bold shadow-md z-10">X</button>
+                </div>
+            </div>
+
+            <!-- Controls & Description -->
+            <div class="flex flex-col justify-center gap-4">
+                <div class="sketch-box p-6 bg-paper-dark">
+                    <h2 class="font-marker text-4xl mb-4 border-b-2 border-gray-400 pb-2 inline-block font-bold">Teknik Seçimi</h2>
+                    <p class="text-lg text-gray-700 mb-6 leading-tight">
+                        Yüklediğiniz görseli geleneksel baskı tekniklerinden biriyle yeniden yorumlayın. 
+                        Yapay zeka, görüntüyü kağıt üzerine mürekkep dokusuyla işleyecektir.
+                    </p>
+                    
+                    <div class="grid grid-cols-1 gap-3" id="styleButtons">
+                        <button onclick="selectStyle('linol', this)" class="sketch-btn py-3 px-4 text-xl font-bold text-left group">
+                            <span>1. Linol Baskı</span>
+                        </button>
+                        <button onclick="selectStyle('ahsap', this)" class="sketch-btn py-3 px-4 text-xl font-bold text-left group">
+                            <span>2. Ahşap Baskı</span>
+                        </button>
+                        <button onclick="selectStyle('gravur', this)" class="sketch-btn py-3 px-4 text-xl font-bold text-left group">
+                            <span>3. Gravür</span>
+                        </button>
+                        <button onclick="selectStyle('aquatint', this)" class="sketch-btn py-3 px-4 text-xl font-bold text-left group">
+                            <span>4. Aquatint</span>
+                        </button>
+                        <button onclick="selectStyle('mezzotint', this)" class="sketch-btn py-3 px-4 text-xl font-bold text-left group">
+                            <span>5. Mezzotint</span>
+                        </button>
+                    </div>
+
+                    <button id="generateBtn" onclick="generateArt()" class="mt-8 w-full bg-sanguine text-white font-marker text-3xl py-3 rounded shadow-lg transform hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:cursor-not-allowed tracking-wider font-bold">
+                        BAŞLAT
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. RESULT SECTION -->
+        <section id="resultSection" class="hidden flex flex-col items-center w-full animate-draw">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="h-px w-12 bg-gray-400"></span>
+                <h2 class="font-marker text-4xl text-pencil font-bold">Eseriniz</h2>
+                <span class="h-px w-12 bg-gray-400"></span>
+            </div>
+
+            <!-- Result Canvas -->
+            <div class="relative p-4 bg-white shadow-2xl rotate-[-1deg] max-w-2xl w-full border-8 border-white">
+                
+                <!-- LOADING & ERROR OVERLAY -->
+                <div id="loadingIndicator" class="hidden absolute inset-0 z-20 bg-white/95 flex flex-col items-center justify-center p-8 text-center">
+                    <div id="loaderContent" class="flex flex-col items-center">
+                        <div class="scribble-loader mb-4"></div>
+                        <p class="font-hand text-2xl animate-pulse">Kağıt presleniyor...</p>
+                        <p id="loadingText" class="text-sm text-gray-500 mt-2">Mürekkep hazırlanıyor</p>
+                    </div>
+                </div>
+
+                <img id="resultImage" src="" class="w-full h-auto object-contain filter contrast-110 sepia-[0.2]" alt="Sonuç">
+                
+                <!-- İmza Alanı -->
+                <div class="mt-4 flex justify-between items-end px-4 pb-2 font-sketch text-gray-500 text-xl">
+                    <span>1/1 Edisyon</span>
+                    <span id="signatureDate"></span>
+                    <span class="font-marker text-2xl text-black">PrintMaker</span>
+                </div>
+            </div>
+
+            <div class="flex gap-4 mt-8">
+                <button onclick="downloadResult()" class="sketch-btn py-2 px-8 text-xl font-bold hover:bg-pencil hover:text-white">
+                    İNDİR
+                </button>
+                <button onclick="resetApp()" class="text-gray-500 underline hover:text-sanguine font-bold text-lg">
+                    Yeni Çalışma
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="mt-16 mb-12 text-center">
+        <a href="https://youtu.be/-3LBV1OhjMQ?si=qcYiG9g2SxRmcqHk&t=100" target="_blank" 
+           class="inline-block relative group cursor-pointer transition-transform duration-300 hover:-translate-y-1">
+            <div class="absolute inset-0 bg-gray-800/20 rounded-lg transform rotate-2 group-hover:rotate-3 transition-transform filter blur-[1px]"></div>
+            <div class="relative bg-[#fdfbf7] border-2 border-dashed border-[#2d2d2d] rounded-lg px-8 py-4 transform -rotate-1 group-hover:rotate-0 transition-all duration-300 shadow-sm group-hover:border-sanguine">
+                <p class="font-sketch text-2xl text-gray-600 group-hover:text-sanguine font-bold tracking-wide transition-colors">
+                    "Bu bir eskitenekekutu hayratıdır..."
+                </p>
+                <div class="flex items-center justify-center gap-1 mt-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <span class="h-px w-4 bg-current"></span>
+                    <span class="text-[10px] font-hand uppercase tracking-widest text-gray-500 group-hover:text-sanguine">İzlemek için Tıkla</span>
+                    <span class="h-px w-4 bg-current"></span>
+                </div>
+            </div>
+        </a>
+    </footer>
+
+    <script>
+        // --- API & CONFIG ---
+        const apiGenerateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+        
+        // --- STATE ---
+        let state = {
+            base64Image: null,
+            mimeType: null, // MimeType eklendi
+            selectedStyle: null,
+            isGenerating: false
+        };
+
+        // --- STYLES & PROMPTS ---
+        const styles = {
+            linol: {
+                name: "Linol Baskı",
+                prompt: "Create a Linocut print (Linoleum cut). Bold, blocky black lines against white paper. High contrast. Visible carving marks and gouge texture. Expressionist style. Minimal shading, focus on strong graphic shapes and negative space. Hand-printed texture with ink splotches. Monochrome black ink on textured paper.",
+            },
+            ahsap: {
+                name: "Ahşap Baskı",
+                prompt: "Create a Woodcut print (Woodblock). Visible wood grain texture in the background. Jagged, angular lines. Harsh shadows. Albrecht Dürer style. Crude but expressive carving. Medieval aesthetic. Thick ink application. The image should look like it was stamped from a carved wooden block.",
+            },
+            gravur: {
+                name: "Gravür",
+                prompt: "Create a Copperplate Engraving. Intricate cross-hatching and fine parallel lines to create shading. Banknote style or vintage encyclopedia illustration style. Very high detail. Fine line work. Antique aesthetic. Sepia or black ink on aged paper.",
+            },
+            aquatint: {
+                name: "Aquatint",
+                prompt: "Create an Aquatint print. Focus on tonal variations and gradients rather than lines. Acid etching texture. Granular, speckled texture for shading. Soft, watercolor-like wash effects created by etching. Moody, atmospheric, soft edges. Goya-esque print style.",
+            },
+            mezzotint: {
+                name: "Mezzotint",
+                prompt: "Create a Mezzotint print. Rich, velvety blacks and soft gradations of gray. Dramatic chiaroscuro (light and dark). 'Dark manner' printmaking. Smooth transitions without cross-hatching. Soft, hazy atmosphere. The image should emerge from the darkness.",
+            }
+        };
+
+        const universalNegativePrompt = "photorealistic, photograph, digital art, 3d render, glossy, colorful, neon, blurry, bad anatomy, deformed, watermark, text, signature, plastic, shiny, smooth, vector art, anime, cartoon, cgi";
+
+        // --- INITIALIZATION ---
+        document.getElementById('signatureDate').innerText = new Date().toLocaleDateString('tr-TR');
+
+        // --- FUNCTIONS ---
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            // Dosya tipini kaydet (Önemli!)
+            state.mimeType = file.type || "image/png";
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                state.base64Image = e.target.result.split(',')[1];
+                
+                // UI Update
+                document.getElementById('uploadPrompt').classList.add('hidden');
+                document.getElementById('previewContainer').classList.remove('hidden');
+                document.getElementById('previewImg').src = e.target.result;
+                
+                checkReady();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetUpload() {
+            state.base64Image = null;
+            state.mimeType = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('previewImg').src = '';
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('uploadPrompt').classList.remove('hidden');
+            document.getElementById('resultSection').classList.add('hidden');
+            checkReady();
+        }
+
+        function selectStyle(styleKey, btnElement) {
+            state.selectedStyle = styleKey;
+            document.querySelectorAll('.sketch-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+            checkReady();
+        }
+
+        function checkReady() {
+            const btn = document.getElementById('generateBtn');
+            if (state.base64Image && state.selectedStyle) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        async function generateArt() {
+            if (!state.base64Image || !state.selectedStyle || state.isGenerating) return;
+
+            state.isGenerating = true;
+            
+            // UI Update
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+            document.getElementById('resultImage').style.opacity = '0.3';
+            document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+
+            const styleData = styles[state.selectedStyle];
+            const finalPrompt = `
+                Transform this image into a ${styleData.prompt}
+                Subject Identity: Strictly maintain the facial features, expression, and composition of the original image. The person must be recognizable.
+                Medium: Traditional printmaking on textured paper.
+                Quality: Masterpiece, handmade, ink on paper texture.
+                Negative Prompt: ${universalNegativePrompt}
+            `;
+
+            try {
+                // BASİT VE SAĞLAM PAYLOAD
+                const payload = {
+                    contents: [{
+                        parts: [
+                            { text: finalPrompt },
+                            { inlineData: { mimeType: state.mimeType, data: state.base64Image } }
+                        ]
+                    }],
+                    generationConfig: { 
+                        responseModalities: ['IMAGE']
+                    }
+                };
+
+                const response = await fetch(apiGenerateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    // Ekrana gerçek hatayı bas
+                    throw new Error(errorData.error?.message || `API Hatası: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                let base64 = null;
+                if (data.candidates && data.candidates[0].content.parts) {
+                    const part = data.candidates[0].content.parts.find(p => p.inlineData);
+                    if (part) base64 = part.inlineData.data;
+                } else if (data.predictions && data.predictions[0]) {
+                     base64 = data.predictions[0].bytesBase64Encoded;
+                }
+
+                if (base64) {
+                    document.getElementById('resultImage').src = `data:image/png;base64,${base64}`;
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+                    document.getElementById('resultImage').style.opacity = '1';
+                } else {
+                    throw new Error("Görsel oluşturulamadı (Boş veri).");
+                }
+
+            } catch (error) {
+                console.error(error);
+                // Kullanıcıya hatayı göster (Alert ile)
+                let msg = error.message;
+                if(msg.includes('quota') || msg.includes('429')) {
+                    msg = "HATA: API Kotanız Doldu (429). Lütfen daha sonra deneyin.";
+                }
+                alert(msg); 
+                document.getElementById('resultSection').classList.add('hidden');
+            } finally {
+                state.isGenerating = false;
+            }
+        }
+
+        function downloadResult() {
+            const img = document.getElementById('resultImage');
+            if (!img.src || img.src === "") return;
+
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `PrintMaker_${state.selectedStyle}_${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function resetApp() {
+            resetUpload();
+            state.selectedStyle = null;
+            document.querySelectorAll('.sketch-btn').forEach(btn => btn.classList.remove('active'));
+            checkReady();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
